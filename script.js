@@ -1,33 +1,63 @@
-// Bước 1: Gọi API
-fetch("https://api.escuelajs.co/api/v1/products")
-  .then(response => response.json())
-  .then(data => {
-    // Bước 2: Convert JSON → Object dùng cho UI
-    const products = data.map(item => ({
-      id: item.id,
-      title: item.title,
-      price: item.price,
-      description: item.description,
-      image: item.images[0],
-      category: item.category.name
+const API_URL = "https://api.escuelajs.co/api/v1/products";
+const PROXY = "https://images.weserv.nl/?url=";
+
+fetch(API_URL)
+  .then(res => res.json())
+  .then(products => {
+    const fixedProducts = products.map(p => ({
+      id: p.id,
+      title: p.title,
+      price: p.price,
+      description: p.description,
+      category: p.category?.name || "Unknown",
+      image: getValidImage(p)
     }));
 
-    // Bước 3: Hiển thị
-    renderProducts(products);
+    renderProducts(fixedProducts);
   })
-  .catch(error => console.error("Lỗi:", error));
+  .catch(err => console.error(err));
 
-// Hàm render UI
+function getValidImage(product) {
+  let images = product.images;
+
+  // images đôi khi là string JSON
+  if (typeof images === "string") {
+    try {
+      images = JSON.parse(images);
+    } catch {
+      images = [];
+    }
+  }
+
+  if (Array.isArray(images)) {
+    for (let img of images) {
+      if (img && img.startsWith("http")) {
+        return PROXY + encodeURIComponent(img);
+      }
+    }
+  }
+
+  // fallback KHÔNG random – theo ID
+  return `https://picsum.photos/seed/product-${product.id}/600/400`;
+}
+
 function renderProducts(products) {
   const container = document.getElementById("product-list");
 
-  container.innerHTML = products.map(product => `
+  container.innerHTML = products.map(p => `
     <div class="card">
-      <img src="${product.image}" alt="${product.title}">
-      <h3>${product.title}</h3>
-      <p class="price">$${product.price}</p>
-      <p class="desc">${product.description}</p>
-      <span class="category">${product.category}</span>
+      <img 
+        src="${p.image}"
+        alt="${p.title}"
+        loading="lazy"
+        onerror="this.src='https://picsum.photos/seed/product-${p.id}/600/400'"
+      >
+      <div class="card-body">
+        <h3>${p.title}</h3>
+        <div class="price">$${p.price}</div>
+        <div class="desc">${p.description}</div>
+        <div class="category">${p.category}</div>
+      </div>
     </div>
   `).join("");
 }
